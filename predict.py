@@ -15,8 +15,11 @@ def ctc_best_path_decoding(y_pred, num_to_char):
     final_text = ""
     for idx in collapsed_path:
         if idx != 0:
-            char = num_to_char.get(idx,"")
-            final_text += char
+            char_list = num_to_char.get(idx,"")
+            if isinstance(char_list, (list, tuple)) and len(char_list) > 2:
+                final_text += char_list[1]
+            elif isinstance(char_list, str):
+                final_text += char_list
     return final_text
 
 def predict_single_image(model, image_path, num_to_char, image_size=(256,64)):
