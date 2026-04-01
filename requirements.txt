@@ -1,4 +1,4 @@
-treamlit
+streamlit
 tensorflow
 opencv-python-headless
 pillow
