@@ -68,7 +68,7 @@ def processing_image(image_path, image_size=(256, 64)):
     
     if img is None:
         return np.zeros((target_h, target_w, 1), dtype=np.float32)
-    img = cv2.GaussianBlur(img, (3, 3),0)
+    img = cv2.medianBlur(img, 3) 
     img = cv2.adaptiveThreshold(
         img, 255, 
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
