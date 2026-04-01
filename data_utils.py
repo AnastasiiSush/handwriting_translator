@@ -65,8 +65,15 @@ def encode_text(text, char_to_num, max_len=32, vocab_size=80):
 def processing_image(image_path, image_size=(256, 64)):
     target_w, target_h = image_size
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    
     if img is None:
         return np.zeros((target_h, target_w, 1), dtype=np.float32)
+    img = cv2.adaptiveThreshold(
+        img, 255, 
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 
+        11, 2
+    )
     h, w = img.shape
     scale = target_h / h
     new_w = int(w * scale)
