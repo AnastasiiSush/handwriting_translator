@@ -15,19 +15,9 @@ st.markdown("---")
 
 @st.cache_resource
 def load_all_resources():
-    DATA_DIR = "./iam_words/"
-    WORDS_TXT_PATH = os.path.join(DATA_DIR, "words.txt")
-    IMG_DIR = os.path.join(DATA_DIR, "words")
-    if os.path.exists(WORDS_TXT_PATH):
-        paths, texts = load_iam_data(WORDS_TXT_PATH, IMG_DIR)
-        char_to_num, num_to_char, vocab_size = create_vocabluary(texts)
-    else:
-        st.warning("Дані IAM не знайдені поруч. Використовується обмежений словник.")
-        characters = list("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-        char_to_num = {char: idx + 1 for idx, char in enumerate(characters)}
-        num_to_char = {idx + 1: char for idx, char in enumerate(characters)}
-        num_to_char[0] = "[blank]"
-
+    characters = list("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-")
+    num_to_char = {idx + 1: char for idx, char in enumerate(characters)}
+    num_to_char[0] = ""
     model_path = "predict_crnn_model.h5"
     model = None
     if os.path.exists(model_path):
@@ -86,8 +76,6 @@ if camera_input is not None:
         st.error("Неможливо виконати розпізнавання: модель не завантажена.")
 
 st.markdown("---")
-st.write("Тип даних словника:", type(num_to_char))
-st.write("Приклад словника:", list(num_to_char.items())[:5])
 with st.expander("Як це працює?"):
     st.write("""
     Цей додаток використовує нейромережу архітектури CRNN (CNN + LSTM + CTC), навчену на датасеті IAM.
