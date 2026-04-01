@@ -86,6 +86,8 @@ if camera_input is not None:
         st.error("Неможливо виконати розпізнавання: модель не завантажена.")
 
 st.markdown("---")
+st.write("Тип даних словника:", type(num_to_char))
+st.write("Приклад словника:", list(num_to_char.items())[:5])
 with st.expander("Як це працює?"):
     st.write("""
     Цей додаток використовує нейромережу архітектури CRNN (CNN + LSTM + CTC), навчену на датасеті IAM.
