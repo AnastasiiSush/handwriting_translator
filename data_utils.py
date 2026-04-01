@@ -65,54 +65,45 @@ def encode_text(text, char_to_num, max_len=32, vocab_size=80):
 def processing_image(image_path, image_size=(256, 64)):
     target_w, target_h = image_size
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    
     if img is None:
         return np.zeros((target_h, target_w, 1), dtype=np.float32)
-    img = cv2.medianBlur(img, 3) 
-    img = cv2.adaptiveThreshold(
-        img, 255, 
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY, 
+
+    img_blurred = cv2.medianBlur(img, 3)
+    img_thresh = cv2.adaptiveThreshold(
+        img_blurred, 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
         11, 2
     )
 
-    # === БЛОК АВТОМАТИЧНОГО ВИРІВНЮВАННЯ (DESKEWING) ===
-    # Інвертуємо кольори для пошуку контурів (контури шукаються по білому кольору)
     coords = np.column_stack(np.where(img_thresh == 0))
-    
+
     if len(coords) > 0:
-        # Знаходимо мінімальний прямокутник, який описує всі чорні пікселі (букви)
         angle = cv2.minAreaRect(coords)[-1]
-        
-        # Коригуємо кут
         if angle < -45:
             angle = -(90 + angle)
         else:
             angle = -angle
-            
-        # Якщо нахил вагомий, то повертаємо
+
         if abs(angle) > 0.5:
             (h, w) = img_thresh.shape
             center = (w // 2, h // 2)
-            
+
             M = cv2.getRotationMatrix2D(center, angle, 1.0)
-            
-            # РЕЗУЛЬТАТ ПОВОРОТУ ПЕРЕЗАПИСУЄМО В ТУ Ж САМУ ЗМІННУ
+
             img_thresh = cv2.warpAffine(
-                img_thresh, M, (w, h), 
-                flags=cv2.INTER_CUBIC, 
-                borderMode=cv2.BORDER_CONSTANT, 
+                img_thresh, M, (w, h),
+                flags=cv2.INTER_CUBIC,
+                borderMode=cv2.BORDER_CONSTANT,
                 borderValue=255
             )
-    # ===================================================
 
-    
-    h, w = img.shape
+    h, w = img_thresh.shape
     scale = target_h / h
     new_w = int(w * scale)
     if new_w > target_w:
         new_w = target_w
-    image_resized = cv2.resize(img, (new_w, target_h))
+    image_resized = cv2.resize(img_thresh, (new_w, target_h))
     final_image = np.ones((target_h, target_w), dtype=np.float32) * 255
     final_image[:, :new_w] = image_resized
     final_image = 1.0 - (final_image / 255.0)
