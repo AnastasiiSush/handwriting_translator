@@ -75,6 +75,37 @@ def processing_image(image_path, image_size=(256, 64)):
         cv2.THRESH_BINARY, 
         11, 2
     )
+
+    coords = np.column_stack(np.where(img_thresh == 0))
+    
+    if len(coords) > 0:
+        # Знаходимо мінімальний прямокутник, який описує всі чорні пікселі (букви)
+        angle = cv2.minAreaRect(coords)[-1]
+        
+        # OpenCV повертає кути в специфічному діапазоні. 
+        # Коригуємо кут для правильного повороту:
+        if angle < -45:
+            angle = -(90 + angle)
+        else:
+            angle = -angle
+            
+        # Якщо нахил невеликий (менше 0.5 градуса), то й повертати не треба
+        if abs(angle) > 0.5:
+            (h, w) = img_thresh.shape
+            center = (w // 2, h // 2)
+            
+            # Створюємо матрицю повороту
+            M = cv2.getRotationMatrix2D(center, angle, 1.0)
+            
+            # Повертаємо картинку. Фон заливаємо білим кольором (255)
+            img_thresh = cv2.warpAffine(
+                img_thresh, M, (w, h), 
+                flags=cv2.INTER_CUBIC, 
+                borderMode=cv2.BORDER_CONSTANT, 
+                borderValue=255
+            )
+
+    
     h, w = img.shape
     scale = target_h / h
     new_w = int(w * scale)
