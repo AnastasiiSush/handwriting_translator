@@ -20,6 +20,7 @@ def load_all_resources():
     vocab_path = "correct_vocab.json"
     model = None
     num_to_char = {}
+    reader = None
 
     if os.path.exists(vocab_path):
         with open(vocab_path, "r", encoding="utf-8") as f:
@@ -31,10 +32,18 @@ def load_all_resources():
         model = tf.keras.models.load_model(model_path, compile=False)
     else:
         st.error(f"Файл моделі {model_path} не знайдено! Навчіть модель спочатку.")
-    return model, num_to_char
+
+    try:
+        import easyocr
+
+        reader = easyocr.Reader(["en"], gpu=False)
+    except Exception as e:
+        st.error(f"Не вдалося завантажити EasyOCR: {e}")
+
+    return model, num_to_char, reader
 
 with st.spinner('Завантаження моделі та словника... зачекайте...'):
-    model, num_to_char = load_all_resources()
+    model, num_to_char, reader = load_all_resources()
 
 # --- БІЧНА ПАНЕЛЬ (SIDEBAR) ---
 st.sidebar.header("Налаштування")
