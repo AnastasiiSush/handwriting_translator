@@ -5,9 +5,10 @@ import os
 import tensorflow as tf
 from PIL import Image
 from streamlit import camera_input
+import json
 
 from data_utils import processing_image, load_iam_data, create_vocabluary
-from predict import ctc_best_path_decoding
+from predict import ctc_best_path_decoding, get_final_word
 
 st.set_page_config(page_title="Handwritten Text Recognizer", page_icon="📝")
 st.title("📝 Розпізнавання та Переклад Рукописного Тексту")
@@ -15,11 +16,17 @@ st.markdown("---")
 
 @st.cache_resource
 def load_all_resources():
-    characters = list("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-")
-    num_to_char = {idx + 1: char for idx, char in enumerate(characters)}
-    num_to_char[0] = ""
     model_path = "predict_crnn_model.h5"
+    vocab_path = "correct_vocab.json"
     model = None
+    num_to_char = {}
+
+    if os.path.exists(vocab_path):
+        with open(vocab_path, "r", encoding="utf-8") as f:
+            raw_vocab = json.load(f)
+            num_to_char = {int(k): v for k, v in raw_vocab.items()}
+    else:
+        st.error(f"Файл словника {vocab_path} не знайдено! Перевір, чи завантажила ти його на GitHub.")
     if os.path.exists(model_path):
         model = tf.keras.models.load_model(model_path, compile=False)
     else:
@@ -31,8 +38,6 @@ with st.spinner('Завантаження моделі та словника... 
 
 # --- БІЧНА ПАНЕЛЬ (SIDEBAR) ---
 st.sidebar.header("Налаштування")
-
-# 1. Вибір мови (твоє завдання)
 languages = {
     "Англійська (English)": "en",
     "Іспанська (Español) - Незабаром": "es",
@@ -43,38 +48,58 @@ languages = {
 selected_lang_name = st.sidebar.selectbox("Виберіть мову розпізнавання:", list(languages.keys()))
 selected_lang_code = languages[selected_lang_name]
 
-# Попередження, якщо вибрано не англійську
 if selected_lang_code != "en":
     st.sidebar.warning(f"На жаль, мова '{selected_lang_name}' поки що недоступна. Модель навчена тільки на англійському рукопису. Буде використано Англійську.")
-    selected_lang_code = "en" # Примусово ставимо англійську
+    selected_lang_code = "en"
 
-# --- ГОЛОВНА ЗОНА ---
-st.subheader("1. Зробіть фото тексту")
-camera_input = st.camera_input("Натисніть кнопку, щоб зробити знімок")
+# --- БЛОК ВИБОРУ СПОСОБУ ВВЕДЕННЯ ---
+st.subheader("1. Оберіть спосіб введення")
+input_method = st.radio(
+    "Як ви хочете надати зображення?",
+    ("Зробити фото камерою", "Завантажити файл з пристрою")
+)
+image_file = None
 
+if input_method == "Зробити фото камерою":
+    camera_capture = st.camera_input("Натисніть кнопку, щоб зробити знімок")
+    if camera_capture is not None:
+        image_file = camera_capture
+        st.success("Фото успішно зроблено!")
+
+elif input_method == "Завантажити файл з пристрою":
+    uploaded_file = st.file_uploader(
+        "Оберіть зображення рукописного тексту",
+        type=['png', 'jpg', 'jpeg']
+    )
+    if uploaded_file is not None:
+        image_file = uploaded_file
+        st.success("Файл успішно завантажено!")
+        st.image(uploaded_file, caption="Завантажене зображення", use_column_width=True)
+
+# --- УНІФІКОВАНИЙ БЛОК ОБРОБКИ ЗОБРАЖЕННЯ ---
 processed_text = ""
+temp_filename = "temp_capture.png"
 
-if camera_input is not None:
-    st.success("Фото успішно зроблено!")
-    pil_image = Image.open(camera_input)
-    temp_filename = "temp_capture.png"
+if image_file is not None:
+    pil_image = Image.open(image_file)
+    if pil_image.mode == 'RGBA':
+        pil_image = pil_image.convert('RGB')
     pil_image.save(temp_filename)
 
     st.subheader("2. Результат розпізнавання")
     if model is not None:
         with st.spinner('Розпізнавання тексту...'):
-            img = processing_image(temp_filename, image_size=(256,64))
+            img = processing_image(temp_filename, image_size=(256, 64))
             img_batch = np.expand_dims(img, axis=0)
-
             preds = model.predict(img_batch)
-            processed_text = ctc_best_path_decoding(preds[0], num_to_char)
+            raw_text = ctc_best_path_decoding(preds[0], num_to_char)
+            final_result = get_final_word(raw_text)
             os.remove(temp_filename)
-            st.text_area("Розпізнаний текст:", value=processed_text, height=100)
 
-            st.info("Ви можете скопіювати текст з поля вище.")
+            st.text_area("Результат моделі (сирий):", value=final_result, height=70)
+            st.info("Ви можете скопіювати текст з полів вище.")
     else:
         st.error("Неможливо виконати розпізнавання: модель не завантажена.")
-
 st.markdown("---")
 with st.expander("Як це працює?"):
     st.write("""

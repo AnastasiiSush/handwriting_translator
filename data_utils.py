@@ -1,11 +1,8 @@
 import os
 import cv2
 import numpy as np
-from keras.src.ops import dtype
 from tensorflow.keras.utils import Sequence
-
-#from main import vocab_size
-
+import random
 
 # 1. Завантаження даних
 def load_iam_data(txt_path, img_dir):
@@ -113,7 +110,7 @@ def processing_image(image_path, image_size=(256, 64)):
 
 #5. Class
 class IAMDataGenerator(Sequence):
-    def __init__(self, image_paths, labels, char_to_num, batch_size=32, image_size=(256,64), max_text_len=32, shuffle=True):
+    def __init__(self, image_paths, labels, char_to_num, batch_size=32, image_size=(256,64), max_text_len=32, shuffle=True, augment=False):
         super().__init__()
         self.image_paths = image_paths
         self.labels = labels
@@ -121,12 +118,13 @@ class IAMDataGenerator(Sequence):
         self.batch_size = batch_size
         self.image_size = image_size
         self.max_text_len = max_text_len
+        self.augment = augment
         self.shuffle = shuffle
         self.indexes = np.arange(len(self.labels))
         self.on_epoch_end()
 
     def __len__(self):
-        return len(self.image_paths) // self.batch_size
+        return int(np.floor(len(self.image_paths) / self.batch_size))
 
     def on_epoch_end(self):
         if self.shuffle:
@@ -136,12 +134,34 @@ class IAMDataGenerator(Sequence):
         indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
         batch_images = np.zeros((self.batch_size, self.image_size[1], self.image_size[0], 1), dtype=np.float32)
         batch_labels = np.zeros((self.batch_size, self.max_text_len), dtype=np.int32)
-
-        input_lenght = np.ones((self.batch_size, 1), dtype=np.int32) * (self.image_size[0] // 4)
+        input_length = np.ones((self.batch_size, 1), dtype=np.int32) * (self.image_size[0] // 4)
         label_length = np.zeros((self.batch_size, 1), dtype=np.int32)
+
         for i, idx in enumerate(indexes):
-            img = processing_image(self.image_paths[idx], image_size=self.image_size)
-            batch_images[i] = img
+            img_processed = processing_image(self.image_paths[idx], image_size=self.image_size)
+            img = np.squeeze(img_processed)
+
+            if self.augment:
+                if random.random() < 0.5:
+                    angle = random.uniform(-3, 3)
+                    h, w = img.shape
+                    M = cv2.getRotationMatrix2D((w // 2, h // 2), angle, 1.0)
+                    img = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+
+                if random.random() < 0.3:
+                    kernel_size = random.choice([2, 3])
+                    kernel = np.ones((kernel_size, kernel_size), np.uint8)
+                    if random.random() < 0.5:
+                        img = cv2.dilate(img, kernel, iterations=1)
+                    else:
+                        img = cv2.erode(img, kernel, iterations=1)
+
+                if random.random() < 0.2:
+                    sigma = random.uniform(0.1, 1.0)
+                    img = cv2.GaussianBlur(img, (3, 3), sigma)
+
+            img = np.clip(img, 0, 1)
+            batch_images[i] = np.expand_dims(img, axis=-1)
             text = self.labels[idx]
             vocab_sz = len(self.char_to_num)
 
@@ -153,7 +173,7 @@ class IAMDataGenerator(Sequence):
         inputs = {
             "image": batch_images,
             "label": batch_labels,
-            "input_length": input_lenght,
+            "input_length": input_length,
             "label_length": label_length
         }
         return inputs, np.zeros((self.batch_size))
