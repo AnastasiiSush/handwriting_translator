@@ -56,7 +56,7 @@ if selected_lang_code != "en":
 st.subheader("1. Оберіть спосіб введення")
 input_method = st.radio(
     "Як ви хочете надати зображення?",
-    ("Зробити фото камерою", "Завантажити файл з пристрою")
+    ("Завантажити файл з пристрою", "Зробити фото камерою")
 )
 image_file = None
 
@@ -100,6 +100,29 @@ if image_file is not None:
             st.info("Ви можете скопіювати текст з полів вище.")
     else:
         st.error("Неможливо виконати розпізнавання: модель не завантажена.")
+
+st.write("Чи правильна була відповідь асистента?")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("Так, розпізнано вірно", use_container_width=True):
+        st.session_state.feedback = "yes"
+
+with col2:
+    if st.button("Ні, є помилки", use_container_width=True):
+        st.session_state.feedback = "no"
+
+if "feedback" in st.session_state:
+    if st.session_state.feedback == "yes":
+        st.toast("ПЕРЕМОГА НАХУЙ", icon="😍")
+    elif st.session_state.feedback == "no":
+        st.toast("сука еблан модель", icon="🥺")
+
+        user_correction = st.text_input("Введіть правильний варіант слова (за бажанням):")
+        if user_correction:
+            st.success(f"Дякуємо! Ми врахуємо, що правильно писати: **{user_correction}**")
+
 st.markdown("---")
 with st.expander("Як це працює?"):
     st.write("""
