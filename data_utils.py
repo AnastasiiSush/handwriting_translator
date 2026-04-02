@@ -8,31 +8,46 @@ import easyocr
 reader = easyocr.Reader(["en"], gpu = False)
 
 def detect_crop_text(image_path, output_path="temp_cropped.png"):
-    img = cv2.imread(image_path)
-    if img is None:
+    try:
+        img = cv2.imread(image_path)
+        if img is None:
+            return False
+
+        result = reader.readtext(image_path)
+
+        if not result:
+            return False
+
+        bbox = result[0][0]
+
+        # Примусово перетворюємо ВСІ координати в чисті Python int
+        xs = [int(float(point[0])) for point in bbox]
+        ys = [int(float(point[1])) for point in bbox]
+
+        xmin, xmax = max(0, min(xs)), min(img.shape[1], max(xs))
+        ymin, ymax = max(0, min(ys)), min(img.shape[0], max(ys))
+
+        # Додаємо поля
+        h_pad = int((ymax - ymin) * 0.15)
+        w_pad = int((xmax - xmin) * 0.15)
+
+        # Слідкуємо, щоб індекси не виходили за межі картинки
+        ymin = int(max(0, ymin - h_pad))
+        ymax = int(min(img.shape[0], ymax + h_pad))
+        xmin = int(max(0, xmin - w_pad))
+        xmax = int(min(img.shape[1], xmax + w_pad))
+
+        # Вирізаємо
+        cropped_img = img[ymin:ymax, xmin:xmax]
+
+        if cropped_img.size == 0:
+            return False
+
+        cv2.imwrite(output_path, cropped_img)
+        return True
+    except Exception as e:
+        print(f"Помилка детекції: {e}")
         return False
-    result = reader.readtext(image_path)
-    if result is None:
-        return False
-
-    bbox = result[0][0]
-    xs = [int(point[0]) for point in bbox]
-    ys = [int(point[1]) for point in bbox]
-
-    xmin, xmax = max(0, min(xs)), min(img.shape[1], max(xs))
-    ymin, ymax = max(0, min(ys)), min(img.shape[0], max(ys))
-
-    h_pad = int((ymax - ymin) * 0.15)
-    w_pad = int((xmax - xmin) * 0.15)
-
-    ymin = max(0, ymin - h_pad)
-    ymax = min(img.shape[0], ymax + h_pad)
-    xmin = max(0, xmin - w_pad)
-    xmax = min(img.shape[1], xmax + w_pad)
-
-    cropped_img = img[ymin:ymax, xmin:xmax]
-    cv2.imwrite(output_path, cropped_img)
-    return True
 
 def load_iam_data(txt_path, img_dir):
     image_paths = []
