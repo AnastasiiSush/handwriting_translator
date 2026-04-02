@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow.keras.utils import Sequence
 import random
 
-def detect_and_crop_text(image_path, output_path="temp_cropped.png"):
+def detect_crop_text(image_path, output_path="temp_cropped.png"):
     try:
         img = cv2.imread(image_path)
         if img is None:
