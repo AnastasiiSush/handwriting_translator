@@ -7,7 +7,7 @@ from PIL import Image
 from streamlit import camera_input
 import json
 
-from data_utils import processing_image, load_iam_data, create_vocabluary
+from data_utils import processing_image, detect_crop_text
 from predict import ctc_best_path_decoding, get_final_word
 
 st.set_page_config(page_title="Handwritten Text Recognizer", page_icon="📝")
@@ -82,46 +82,70 @@ temp_filename = "temp_capture.png"
 
 if image_file is not None:
     pil_image = Image.open(image_file)
-    if pil_image.mode == 'RGBA':
-        pil_image = pil_image.convert('RGB')
-    pil_image.save(temp_filename)
+    if pil_image.mode == "RGBA":
+        pil_image = pil_image.convert("RGB")
+
+    temp_original = "temp_capture.png"
+    temp_cropped = "temp_cropped.png"
+    pil_image.save(temp_original)
 
     st.subheader("2. Результат розпізнавання")
     if model is not None:
-        with st.spinner('Розпізнавання тексту...'):
-            img = processing_image(temp_filename, image_size=(256, 64))
-            img_batch = np.expand_dims(img, axis=0)
-            preds = model.predict(img_batch)
-            raw_text = ctc_best_path_decoding(preds[0], num_to_char)
-            final_result = get_final_word(raw_text)
-            os.remove(temp_filename)
+        with st.spinner("Виявлення та вирізання тексту..."):
+            detection_success = detect_crop_text(
+                temp_original, output_path=temp_cropped
+            )
 
-            st.text_area("Результат моделі (сирий):", value=final_result, height=70)
-            st.info("Ви можете скопіювати текст з полів вище.")
-    else:
-        st.error("Неможливо виконати розпізнавання: модель не завантажена.")
+        if detection_success:
+            with st.spinner("Розпізнавання тексту..."):
+                cropped_pil = Image.open(temp_cropped)
+                st.image(
+                    cropped_pil,
+                    caption="Вирізане слово для розпізнавання",
+                    use_container_width=True,
+                )
 
-st.write("Чи правильна була відповідь асистента?")
+                img = processing_image(temp_cropped, image_size=(256, 64))
+                img_batch = np.expand_dims(img, axis=0)
 
-col1, col2 = st.columns(2)
+                preds = model.predict(img_batch)
+                raw_text = ctc_best_path_decoding(preds[0], num_to_char)
+                final_result = get_final_word(raw_text)
+                os.remove(temp_original)
+                os.remove(temp_cropped)
 
-with col1:
-    if st.button("Так, розпізнано вірно", use_container_width=True):
-        st.session_state.feedback = "yes"
+                st.text_area(
+                    "Результат моделі (сирий):", value=final_result, height=70
+                )
 
-with col2:
-    if st.button("Ні, є помилки", use_container_width=True):
-        st.session_state.feedback = "no"
+                st.info("Ви можете скопіювати текст з полів вище.")
 
-if "feedback" in st.session_state:
-    if st.session_state.feedback == "yes":
-        st.success("ПЕРЕМОГА НАХУЙ")
-    elif st.session_state.feedback == "no":
-        st.error("сука еблан модель")
+                st.write("Чи правильна була відповідь асистента?")
 
-        user_correction = st.text_input("Введіть правильний варіант слова (за бажанням):")
-        if user_correction:
-            st.success(f"Дякуємо! Ми врахуємо, що правильно писати: **{user_correction}**")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    if st.button("Так, розпізнано вірно", use_container_width=True):
+                        st.session_state.feedback = "yes"
+
+                with col2:
+                    if st.button("Ні, є помилки", use_container_width=True):
+                        st.session_state.feedback = "no"
+
+                if "feedback" in st.session_state:
+                    if st.session_state.feedback == "yes":
+                        st.success("ПЕРЕМОГА НАХУЙ")
+                    elif st.session_state.feedback == "no":
+                        st.error("сука еблан модель")
+
+                        user_correction = st.text_input("Введіть правильний варіант слова (за бажанням):")
+                        if user_correction:
+                            st.success(f"Дякуємо! Ми врахуємо, що правильно писати: **{user_correction}**")
+        else:
+            st.warning(
+                "Камера не змогла чітко знайти текст. Спробуйте зробити фото ближче або з кращим освітленням."
+            )
+            os.remove(temp_original)
 
 st.markdown("---")
 with st.expander("Як це працює?"):
