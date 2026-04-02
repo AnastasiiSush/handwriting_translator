@@ -6,7 +6,6 @@ import tensorflow as tf
 from PIL import Image
 from streamlit import camera_input
 import json
-import easyocr
 
 from data_utils import processing_image, detect_crop_text
 from predict import ctc_best_path_decoding, get_final_word
@@ -35,15 +34,11 @@ def load_all_resources():
     else:
         st.error(f"Файл моделі {model_path} не знайдено!")
 
-    # 2. Окремо створюємо і кешуємо EasyOCR Reader
-    # Streamlit Cloud зрозуміє, що тут треба почекати
-    ocr_reader = easyocr.Reader(["en"], gpu=False)
-
-    return model, num_to_char, ocr_reader
+    return model, num_to_char
 
 
 with st.spinner('Завантаження моделі та словника... зачекайте...'):
-    model, num_to_char, reader = load_all_resources()
+    model, num_to_char = load_all_resources()
 
 # --- БІЧНА ПАНЕЛЬ (SIDEBAR) ---
 st.sidebar.header("Налаштування")

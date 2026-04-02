@@ -3,9 +3,6 @@ import cv2
 import numpy as np
 from tensorflow.keras.utils import Sequence
 import random
-import easyocr
-
-reader = easyocr.Reader(["en"], gpu = False)
 
 def detect_crop_text(image_path, output_path="temp_cropped.png"):
     try:
@@ -13,31 +10,34 @@ def detect_crop_text(image_path, output_path="temp_cropped.png"):
         if img is None:
             return False
 
-        result = reader.readtext(image_path)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        mser = cv2.MSER_create(_delta=5, _min_area=60, _max_area=14400)
+        regions, _ = mser.detectRegions(gray)
 
-        if not result:
+        if not regions:
             return False
 
-        bbox = result[0][0]
+        all_points = []
+        for region in regions:
+            for point in region:
+                all_points.append(point)
 
-        # Примусово перетворюємо ВСІ координати в чисті Python int
-        xs = [int(float(point[0])) for point in bbox]
-        ys = [int(float(point[1])) for point in bbox]
+        if not all_points:
+            return False
 
-        xmin, xmax = max(0, min(xs)), min(img.shape[1], max(xs))
-        ymin, ymax = max(0, min(ys)), min(img.shape[0], max(ys))
+        all_points = np.array(all_points)
+        xmin, ymin = np.min(all_points, axis=0)
+        xmax, ymax = np.max(all_points, axis=0)
 
-        # Додаємо поля
-        h_pad = int((ymax - ymin) * 0.15)
-        w_pad = int((xmax - xmin) * 0.15)
+        h, w, _ = img.shape
+        h_pad = int((ymax - ymin) * 0.2)
+        w_pad = int((xmax - xmin) * 0.2)
 
-        # Слідкуємо, щоб індекси не виходили за межі картинки
         ymin = int(max(0, ymin - h_pad))
-        ymax = int(min(img.shape[0], ymax + h_pad))
+        ymax = int(min(h, ymax + h_pad))
         xmin = int(max(0, xmin - w_pad))
-        xmax = int(min(img.shape[1], xmax + w_pad))
+        xmax = int(min(w, xmax + w_pad))
 
-        # Вирізаємо
         cropped_img = img[ymin:ymax, xmin:xmax]
 
         if cropped_img.size == 0:
@@ -45,9 +45,11 @@ def detect_crop_text(image_path, output_path="temp_cropped.png"):
 
         cv2.imwrite(output_path, cropped_img)
         return True
+
     except Exception as e:
         print(f"Помилка детекції: {e}")
         return False
+
 
 def load_iam_data(txt_path, img_dir):
     image_paths = []
