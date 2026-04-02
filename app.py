@@ -115,9 +115,9 @@ with col2:
 
 if "feedback" in st.session_state:
     if st.session_state.feedback == "yes":
-        st.toast("ПЕРЕМОГА НАХУЙ", icon="😍")
+        st.success("ПЕРЕМОГА НАХУЙ")
     elif st.session_state.feedback == "no":
-        st.toast("сука еблан модель", icon="🥺")
+        st.error("сука еблан модель")
 
         user_correction = st.text_input("Введіть правильний варіант слова (за бажанням):")
         if user_correction:
