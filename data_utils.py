@@ -4,15 +4,19 @@ import numpy as np
 from tensorflow.keras.utils import Sequence
 import random
 
-def detect_crop_text(image_path, output_path="temp_cropped.png"):
+def detect_and_crop_text(image_path, output_path="temp_cropped.png"):
     try:
         img = cv2.imread(image_path)
         if img is None:
             return False
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        mser = cv2.MSER_create(_delta=5, _min_area=60, _max_area=14400)
-        regions, _ = mser.detectRegions(gray)
+        binary = cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+        )
+
+        mser = cv2.MSER_create(_delta=5, _min_area=30, _max_area=14400)
+        regions, _ = mser.detectRegions(binary)
 
         if not regions:
             return False
@@ -22,22 +26,16 @@ def detect_crop_text(image_path, output_path="temp_cropped.png"):
             for point in region:
                 all_points.append(point)
 
-        if not all_points:
-            return False
-
         all_points = np.array(all_points)
         xmin, ymin = np.min(all_points, axis=0)
         xmax, ymax = np.max(all_points, axis=0)
 
         h, w, _ = img.shape
-        h_pad = int((ymax - ymin) * 0.2)
-        w_pad = int((xmax - xmin) * 0.2)
+        h_pad = int((ymax - ymin) * 0.25)
+        w_pad = int((xmax - xmin) * 0.25)
 
-        ymin = int(max(0, ymin - h_pad))
-        ymax = int(min(h, ymax + h_pad))
-        xmin = int(max(0, xmin - w_pad))
-        xmax = int(min(w, xmax + w_pad))
-
+        ymin, ymax = int(max(0, ymin - h_pad)), int(min(h, ymax + h_pad))
+        xmin, xmax = int(max(0, xmin - w_pad)), int(min(w, xmax + w_pad))
         cropped_img = img[ymin:ymax, xmin:xmax]
 
         if cropped_img.size == 0:
@@ -49,7 +47,6 @@ def detect_crop_text(image_path, output_path="temp_cropped.png"):
     except Exception as e:
         print(f"Помилка детекції: {e}")
         return False
-
 
 def load_iam_data(txt_path, img_dir):
     image_paths = []
@@ -105,54 +102,75 @@ def encode_text(text, char_to_num, max_len=32, vocab_size=80):
 
 
 # 4. Обробка зображення (з виправленою помилкою!)
+# def processing_image(image_path, image_size=(256, 64)):
+#     target_w, target_h = image_size
+#     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+#     if img is None:
+#         return np.zeros((target_h, target_w, 1), dtype=np.float32)
+#
+#     img_blurred = cv2.medianBlur(img, 3)
+#     img_thresh = cv2.adaptiveThreshold(
+#         img_blurred, 255,
+#         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+#         cv2.THRESH_BINARY,
+#         11, 2
+#     )
+#
+#     coords = np.column_stack(np.where(img_thresh == 0))
+#
+#     if len(coords) > 0:
+#         angle = cv2.minAreaRect(coords)[-1]
+#         if angle < -45:
+#             angle = -(90 + angle)
+#         else:
+#             angle = -angle
+#
+#         if abs(angle) > 0.5:
+#             (h, w) = img_thresh.shape
+#             center = (w // 2, h // 2)
+#
+#             M = cv2.getRotationMatrix2D(center, angle, 1.0)
+#
+#             img_thresh = cv2.warpAffine(
+#                 img_thresh, M, (w, h),
+#                 flags=cv2.INTER_CUBIC,
+#                 borderMode=cv2.BORDER_CONSTANT,
+#                 borderValue=255
+#             )
+#
+#     h, w = img_thresh.shape
+#     scale = target_h / h
+#     new_w = int(w * scale)
+#     if new_w > target_w:
+#         new_w = target_w
+#     image_resized = cv2.resize(img_thresh, (new_w, target_h))
+#     final_image = np.ones((target_h, target_w), dtype=np.float32) * 255
+#     final_image[:, :new_w] = image_resized
+#     final_image = 1.0 - (final_image / 255.0)
+#     final_image = np.expand_dims(final_image, axis=-1)
+#     return final_image
+
 def processing_image(image_path, image_size=(256, 64)):
-    target_w, target_h = image_size
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    if img is None:
-        return np.zeros((target_h, target_w, 1), dtype=np.float32)
+    h, w = img.shape
+    target_w, target_h = image_size
 
-    img_blurred = cv2.medianBlur(img, 3)
-    img_thresh = cv2.adaptiveThreshold(
-        img_blurred, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        11, 2
-    )
-
-    coords = np.column_stack(np.where(img_thresh == 0))
-
-    if len(coords) > 0:
-        angle = cv2.minAreaRect(coords)[-1]
-        if angle < -45:
-            angle = -(90 + angle)
-        else:
-            angle = -angle
-
-        if abs(angle) > 0.5:
-            (h, w) = img_thresh.shape
-            center = (w // 2, h // 2)
-
-            M = cv2.getRotationMatrix2D(center, angle, 1.0)
-
-            img_thresh = cv2.warpAffine(
-                img_thresh, M, (w, h),
-                flags=cv2.INTER_CUBIC,
-                borderMode=cv2.BORDER_CONSTANT,
-                borderValue=255
-            )
-
-    h, w = img_thresh.shape
-    scale = target_h / h
+    scale = min(target_w / w, target_h / h)
     new_w = int(w * scale)
-    if new_w > target_w:
-        new_w = target_w
-    image_resized = cv2.resize(img_thresh, (new_w, target_h))
-    final_image = np.ones((target_h, target_w), dtype=np.float32) * 255
-    final_image[:, :new_w] = image_resized
-    final_image = 1.0 - (final_image / 255.0)
-    final_image = np.expand_dims(final_image, axis=-1)
-    return final_image
+    new_h = int(h * scale)
 
+    resized = cv2.resize(img, (new_w, new_h))
+
+    canvas = np.ones((target_h, target_w), dtype=np.uint8) * 255
+
+    x_offset = (target_w - new_w) // 2
+    y_offset = (target_h - new_h) // 2
+    canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
+
+    img = canvas.astype(np.float32) / 255.0
+    img = np.expand_dims(img, axis=-1)
+
+    return img
 
 #5. Class
 class IAMDataGenerator(Sequence):

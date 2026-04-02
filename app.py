@@ -125,7 +125,7 @@ if image_file is not None:
                     os.remove(temp_cropped)
 
                 st.text_area(
-                    "Результат моделі (сирий):", value=final_result, height=70
+                    "Результат моделі:", value=final_result, height=70
                 )
 
                 st.info("Ви можете скопіювати текст з полів вище.")
