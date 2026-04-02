@@ -101,22 +101,28 @@ if image_file is not None:
             )
 
         if detection_success:
-            with st.spinner("Розпізнавання тексту..."):
-                cropped_pil = Image.open(temp_cropped)
-                st.image(
-                    cropped_pil,
-                    caption="Вирізане слово для розпізнавання",
-                    use_container_width=True,
-                )
+            file_to_predict = temp_cropped
+            st.success("Текст успішно локалізовано!")
+            st.image(
+                Image.open(temp_cropped),
+                caption="Вирізана область для розпізнавання",
+                use_container_width=True,
+            )
+        else:
+            file_to_predict = temp_original
+            st.warning("Автодетекція не спрацювала. Пробуємо розпізнати все фото цілком.")
 
+            with st.spinner("Розпізнавання тексту..."):
                 img = processing_image(temp_cropped, image_size=(256, 64))
                 img_batch = np.expand_dims(img, axis=0)
 
                 preds = model.predict(img_batch)
                 raw_text = ctc_best_path_decoding(preds[0], num_to_char)
                 final_result = get_final_word(raw_text)
-                os.remove(temp_original)
-                os.remove(temp_cropped)
+                if os.path.exists(temp_original):
+                    os.remove(temp_original)
+                if os.path.exists(temp_cropped):
+                    os.remove(temp_cropped)
 
                 st.text_area(
                     "Результат моделі (сирий):", value=final_result, height=70
@@ -145,11 +151,8 @@ if image_file is not None:
                         user_correction = st.text_input("Введіть правильний варіант слова (за бажанням):")
                         if user_correction:
                             st.success(f"Дякуємо! Ми врахуємо, що правильно писати: **{user_correction}**")
-        else:
-            st.warning(
-                "Камера не змогла чітко знайти текст. Спробуйте зробити фото ближче або з кращим освітленням."
-            )
-            os.remove(temp_original)
+    else:
+        st.warning("Неможливо виконати розпізнавання: модель не завантажена.")
 
 st.markdown("---")
 with st.expander("Як це працює?"):
