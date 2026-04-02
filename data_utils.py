@@ -3,8 +3,37 @@ import cv2
 import numpy as np
 from tensorflow.keras.utils import Sequence
 import random
+import easyocr
 
-# 1. Завантаження даних
+reader = easyocr.Reader(["en"], gpu = False)
+
+def detect_crop_text(image_path, output_path="temp_cropped.png"):
+    img = cv2.imread(image_path)
+    if img is None:
+        return False
+    result = reader.readtext(image_path)
+    if result is None:
+        return False
+
+    bbox = result[0][0]
+    xs = [int(point[0]) for point in bbox]
+    ys = [int(point[1]) for point in bbox]
+
+    xmin, xmax = max(0, min(xs)), min(img.shape[1], max(xs))
+    ymin, ymax = max(0, min(ys)), min(img.shape[0], max(ys))
+
+    h_pad = int((ymax - ymin) * 0.15)
+    w_pad = int((xmax - xmin) * 0.15)
+
+    ymin = max(0, ymin - h_pad)
+    ymax = min(img.shape[0], ymax + h_pad)
+    xmin = max(0, xmin - w_pad)
+    xmax = min(img.shape[1], xmax + w_pad)
+
+    cropped_img = img[ymin:ymax, xmin:xmax]
+    cv2.imwrite(output_path, cropped_img)
+    return True
+
 def load_iam_data(txt_path, img_dir):
     image_paths = []
     labels = []
