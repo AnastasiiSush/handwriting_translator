@@ -6,6 +6,7 @@ import tensorflow as tf
 from PIL import Image
 from streamlit import camera_input
 import json
+import easyocr
 
 from data_utils import processing_image, detect_crop_text
 from predict import ctc_best_path_decoding, get_final_word
@@ -20,27 +21,26 @@ def load_all_resources():
     vocab_path = "correct_vocab.json"
     model = None
     num_to_char = {}
-    reader = None
 
+    # 1. Завантажуємо твою модель і словник
     if os.path.exists(vocab_path):
         with open(vocab_path, "r", encoding="utf-8") as f:
             raw_vocab = json.load(f)
             num_to_char = {int(k): v for k, v in raw_vocab.items()}
     else:
-        st.error(f"Файл словника {vocab_path} не знайдено! Перевір, чи завантажила ти його на GitHub.")
+        st.error(f"Файл словника {vocab_path} не знайдено!")
+
     if os.path.exists(model_path):
         model = tf.keras.models.load_model(model_path, compile=False)
     else:
-        st.error(f"Файл моделі {model_path} не знайдено! Навчіть модель спочатку.")
+        st.error(f"Файл моделі {model_path} не знайдено!")
 
-    try:
-        import easyocr
+    # 2. Окремо створюємо і кешуємо EasyOCR Reader
+    # Streamlit Cloud зрозуміє, що тут треба почекати
+    ocr_reader = easyocr.Reader(["en"], gpu=False)
 
-        reader = easyocr.Reader(["en"], gpu=False)
-    except Exception as e:
-        st.error(f"Не вдалося завантажити EasyOCR: {e}")
+    return model, num_to_char, ocr_reader
 
-    return model, num_to_char, reader
 
 with st.spinner('Завантаження моделі та словника... зачекайте...'):
     model, num_to_char, reader = load_all_resources()
